@@ -4,7 +4,7 @@ from ogn.parser import parse, AprsParseError
 import os
 
 telegram_token = os.getenv("TELEGRAM_TOKEN", "")
-chat_id = os.getenv("CHAT_ID", "")
+chat_ids = os.getenv("CHAT_ID", "").split(",")
 
 ids = os.getenv("OGN_IDS", "").split(",")
 plates = os.getenv("OGN_PLATES", "").split(",")
@@ -14,7 +14,11 @@ plane_meta = {id_: {"plate": label, "wasBelowThreshold": False} for id_, label i
 
 threshold_altitude = 1400
 
-def send_telegram_message(text):
+def send_telegram_messages(text):
+    for chat_id in chat_ids:
+        send_telegram_message(text, chat_id)
+
+def send_telegram_message(text, chat_id):
     url = f"https://api.telegram.org/bot{telegram_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -37,14 +41,14 @@ def process_beacon(raw_message):
             if(float(beacon["altitude"]) < threshold_altitude):
                 if(plane_meta[beacon["name"]]["wasBelowThreshold"] == False):
                     try:
-                        send_telegram_message(plane_meta[beacon["name"]]["plate"] + " ist unter " + str(threshold_altitude) + "m! Höhe: " + str(beacon["altitude"]))
+                        send_telegram_messages(plane_meta[beacon["name"]]["plate"] + " ist unter " + str(threshold_altitude) + "m! Höhe: " + str(beacon["altitude"]))
                         plane_meta[beacon["name"]]["wasBelowThreshold"] = True
                     except Exception:
                         print("ERROR WHEN SENDING MESSAGE")
             else:
                 if(plane_meta[beacon["name"]]["wasBelowThreshold"] == True):
                     try:
-                        send_telegram_message(plane_meta[beacon["name"]]["plate"] + " ist wieder über " + str(threshold_altitude) + "m! Höhe: " + str(beacon["altitude"]))
+                        send_telegram_messages(plane_meta[beacon["name"]]["plate"] + " ist wieder über " + str(threshold_altitude) + "m! Höhe: " + str(beacon["altitude"]))
                         plane_meta[beacon["name"]]["wasBelowThreshold"] = False
                     except Exception:
                         print("ERROR WHEN SENDING MESSAGE")
@@ -63,7 +67,7 @@ for plane in ids:
 
 message_string += "Eingestellte Threshold Höhe: " + str(threshold_altitude)
 
-send_telegram_message(message_string)
+send_telegram_messages(message_string)
  
 try:
     client.run(callback=process_beacon, autoreconnect=True)
